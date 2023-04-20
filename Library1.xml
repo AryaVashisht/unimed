@@ -1,0 +1,538 @@
+<codeTemplateLibrary version="3.9.1">
+  <id>3f3fb9f6-c357-47e8-ba9f-3e0f6e1d78fd</id>
+  <name>Library 1</name>
+  <revision>8</revision>
+  <lastModified>
+    <time>1677337656080</time>
+    <timezone>UTC</timezone>
+  </lastModified>
+  <description></description>
+  <includeNewChannels>false</includeNewChannels>
+  <enabledChannelIds>
+    <string>5dd1cce0-fcd2-4756-900f-47b157f17690</string>
+    <string>f6261a9b-8e35-45c7-bf71-eaf64d284e8c</string>
+    <string>e84827ea-74b1-4f4c-a3be-96a9346be3bb</string>
+  </enabledChannelIds>
+  <disabledChannelIds/>
+  <codeTemplates>
+    <codeTemplate version="3.9.1">
+      <id>8d5f64c5-0f5b-402a-9ce7-2c6e49e29b9f</id>
+      <name>MongoGlobalService</name>
+      <revision>1</revision>
+      <lastModified>
+        <time>1677335978954</time>
+        <timezone>UTC</timezone>
+      </lastModified>
+      <contextSet>
+        <delegate>
+          <contextType>CHANNEL_DEPLOY</contextType>
+          <contextType>CHANNEL_UNDEPLOY</contextType>
+          <contextType>DESTINATION_DISPATCHER</contextType>
+          <contextType>DESTINATION_RESPONSE_TRANSFORMER</contextType>
+          <contextType>CHANNEL_BATCH</contextType>
+          <contextType>CHANNEL_POSTPROCESSOR</contextType>
+          <contextType>CHANNEL_ATTACHMENT</contextType>
+          <contextType>SOURCE_FILTER_TRANSFORMER</contextType>
+          <contextType>CHANNEL_PREPROCESSOR</contextType>
+          <contextType>SOURCE_RECEIVER</contextType>
+          <contextType>DESTINATION_FILTER_TRANSFORMER</contextType>
+        </delegate>
+      </contextSet>
+      <properties class="com.mirth.connect.model.codetemplates.BasicCodeTemplateProperties">
+        <type>FUNCTION</type>
+        <code>/**
+					Modify the description here. Modify the function name and parameters as needed. One function per
+					template is recommended; create a new code template for each new function.
+
+					@param {Any} action - getMongoNextId, update, insert, delete, getMongoCon, search
+					@param {Any} requestMap - colletcionName and other parameters
+					@param {Any} mongoCon - mongoCon if exist otherwise null
+					@return {Map} return Return the Response in form of Map
+					*/
+					function MongoGlobalService(action, requestMap, mongoCon) {
+					var result = {}; //It will return the response as the method call.
+
+					//Function to get the new/existing mongo connection
+					logger.info(&quot;Inside MongoGlobalService with action &quot;+action+&quot; ,requestMap=&quot;+JSON.stringify(requestMap));
+					if(requestMap.find){
+						logger.info(&quot;inside 1st if of code template&quot;)
+					logger.info(&quot;FIND QUERY : &quot;+requestMap.find)
+					}
+					if((mongoCon == undefined) || (mongoCon == null) || (action &amp;&amp; action == &quot;getMongoCon&quot;))
+					{logger.info(&quot;inside 2nd if of code template&quot;)
+					mongoCon = globalMap.get(&apos;mongoClient&apos;);
+					if(!mongoCon || mongoCon == null || mongoCon == undefined || (action &amp;&amp; action == &quot;getMongoCon&quot;))
+					{logger.info(&quot;inside 3rd if of code template&quot;)
+						
+					mongoCon = getMongoConnection();
+					logger.info(&quot;printing logger for mongocon&quot;+mongocon)
+					}
+					if(action &amp;&amp; action == &quot;getMongoCon&quot;)
+					{
+					result.mongoCon = mongoCon;
+					}
+					}
+					//Action to get newSequenceNumber from counter collection or other collection if defined.
+					if(action &amp;&amp; action == &quot;getMongoNextId&quot;)
+					{
+					result.next_id = getMongoNextId(requestMap, mongoCon);
+					}
+
+					//Action to  insert data in collection
+					if(action &amp;&amp; action == &quot;insert&quot;)
+					{
+					result = insertData(requestMap, mongoCon);
+					}
+					//Action to update  data in collection
+					if(action &amp;&amp; action == &quot;update&quot;)
+					{
+					result = updateData(requestMap, mongoCon);
+					}
+					//Action to search/find data from database
+					if(action &amp;&amp; action == &quot;search&quot;)
+					{
+					result = searchData(requestMap, mongoCon);
+					}
+
+					//Action to search/find data from database
+					if(action &amp;&amp; action == &quot;delete&quot;)
+					{
+					result = deleteData(requestMap, mongoCon);
+					}
+					return result;
+					}
+
+					function getMongoNextId(requestMap, mongoCon)
+					{
+					var collectionName = requestMap.collectionName;
+					var finalCollection = &quot;&quot;;
+					var nextIdType = 	requestMap.nextIdType;  //It could be custom(using counter) or domain(using collection.next_id)
+					var customCounterCollection = &quot;counters&quot;  //Default use for customIdGenerator
+					var nextIdName = &quot;seq&quot;;
+					if(requestMap.customCounterCollection)
+					{
+					customCounterCollection = requestMap.customCounterCollection;
+					}
+					if(nextIdType == &quot;domain&quot;)
+					{
+					finalCollection = collectionName+&quot;.next_id&quot;;
+					nextIdName = &quot;next_id&quot;;
+					}
+					else
+					{
+					finalCollection = 	customCounterCollection;
+					}
+					var collection1 = mongoCon.getDB(configurationMap.get(&apos;mongoDBName&apos;)).getCollection(finalCollection);
+					var cursor1;
+					var result = &quot;&quot;;
+					var updateObj = new Packages.com.mongodb.BasicDBObject();
+					var find = new Packages.com.mongodb.BasicDBObject();
+					find.put(&quot;_id&quot;, collectionName);
+					updateObj.put(&quot;$inc&quot;, new Packages.com.mongodb.BasicDBObject(nextIdName,1));
+					cursor1 = collection1.findAndModify(find, null, null, false, updateObj, true, true);
+					result = cursor1.get(nextIdName);
+					return result+&quot;&quot;
+					}
+
+					function insertData(requestMap, mongoCon)  //Should contains requestMap.document as mongo document object Map
+					{
+					var collection1 = mongoCon.getDB(configurationMap.get(&apos;mongoDBName&apos;)).getCollection(requestMap.collectionName);
+					var cursor1;
+					var result = {};
+					cursor1 = collection1.insert(new Packages.com.mongodb.BasicDBObject(requestMap.document));
+					result.success = &quot;OK&quot;;
+					result.message = cursor1;
+					return result;
+					}
+
+					//Update data with requestMap.find, requestMap.document and requestMap.multi
+					function updateData(requestMap, mongoCon)  //Should contains requestMap.document as mongo document object Map
+					{
+					var collection1 = mongoCon.getDB(configurationMap.get(&apos;mongoDBName&apos;)).getCollection(requestMap.collectionName);
+					var cursor1;
+					var result = {};
+					var findObj = requestMap.find //It Should be mongo DB Object
+					var multi = (requestMap.multi) ? requestMap.multi : false //It should be boolean
+					var updateObj = new Packages.com.mongodb.BasicDBObject();
+					updateObj.put(&quot;$set&quot;, new Packages.com.mongodb.BasicDBObject(requestMap.document));
+					cursor1 = collection1.update(findObj, updateObj, false,multi);
+					result.success = &quot;OK&quot;;
+					result.message = cursor1;
+					return result;
+					}
+					//Search/find data with requestMap.find, requestMap.limit and  requestMap.sort
+					function searchData(requestMap, mongoCon)
+					{
+					logger.info(&quot;mongoCon in search Data &quot;+mongoCon);
+					var collection1 = mongoCon.getDB(configurationMap.get(&apos;mongoDBName&apos;)).getCollection(requestMap.collectionName);
+					logger.info(&quot;collection1 &quot;+collection1);
+					var cursor1;
+					var result = {};
+					var findObj = requestMap.find //It Should be mongo DB Object
+					var limit = (requestMap.limit) ? requestMap.limit : &quot;0&quot; //It should be String
+					var sort = (requestMap.sort) ? requestMap.sort : new Packages.com.mongodb.BasicDBObject();
+
+					cursor1 = collection1.find(findObj).sort(sort).limit(parseInt(limit));
+					logger.info(&quot;search Result &quot;+cursor1);
+					result.success = &quot;OK&quot;;
+					result.message = cursor1;
+					result.totalCount = cursor1.count();
+					return result;
+					}
+					//Delete data with requestMap.find
+					function deleteData(requestMap, mongoCon)
+					{
+					var collection1 = mongoCon.getDB(configurationMap.get(&apos;mongoDBName&apos;)).getCollection(requestMap.collectionName);
+					var cursor1;
+					var result = {};
+					var findObj = requestMap.find //It Should be mongo DB Object
+
+					cursor1 = collection1.remove(findObj);
+					result.success = &quot;OK&quot;;
+					result.message = cursor1;
+					return result;
+					}
+					function getMongoConnection()
+					{
+					var mongoIp = configurationMap.get(&apos;mongoIP&apos;)
+					var mongoPort = configurationMap.get(&apos;mongoPort&apos;)
+					var mongoDbName = configurationMap.get(&apos;mongoDBName&apos;)
+					var mongoUsername = configurationMap.get(&apos;mongoUsername&apos;)
+					var mongoPassword = configurationMap.get(&apos;mongoPassword&apos;)
+					var connectionsPerHost = parseInt(configurationMap.get(&apos;connectionsPerHost&apos;))
+					var mongoClient
+
+					if (!mongoClient || mongoClient == null) {
+					var options = Packages.com.mongodb.MongoClientOptions.builder()
+					.connectionsPerHost(connectionsPerHost)
+					.build();
+
+					var sa = new Packages.com.mongodb.ServerAddress(mongoIp, parseInt(mongoPort));
+
+					if (mongoUsername &amp;&amp; mongoPassword) {
+					var mongoCredentialList = new java.util.ArrayList();
+
+					mongoCredentialList.add(Packages.com.mongodb.MongoCredential.createCredential(mongoUsername, mongoDbName, mongoPassword.toCharArray()));
+
+					globalMap.put(&apos;mongoClient&apos;,new Packages.com.mongodb.MongoClient(sa, mongoCredentialList, options))
+
+					} else {
+					globalMap.put(&apos;mongoClient&apos;,new Packages.com.mongodb.MongoClient(sa, options))
+
+					}
+					} else {
+					globalMap.put(&apos;mongoClient&apos;,mongoClient);
+					}
+
+					mongoClient = globalMap.get(&apos;mongoClient&apos;)
+					return mongoClient
+					}</code>
+      </properties>
+    </codeTemplate>
+    <codeTemplate version="3.9.1">
+      <id>15b14470-c1e3-41b7-a052-0edebf65c99b</id>
+      <name>Template 1</name>
+      <revision>28</revision>
+      <lastModified>
+        <time>1677337498677</time>
+        <timezone>UTC</timezone>
+      </lastModified>
+      <contextSet>
+        <delegate>
+          <contextType>DESTINATION_DISPATCHER</contextType>
+          <contextType>DESTINATION_RESPONSE_TRANSFORMER</contextType>
+          <contextType>SOURCE_FILTER_TRANSFORMER</contextType>
+          <contextType>DESTINATION_FILTER_TRANSFORMER</contextType>
+          <contextType>SOURCE_RECEIVER</contextType>
+        </delegate>
+      </contextSet>
+      <properties class="com.mirth.connect.model.codetemplates.BasicCodeTemplateProperties">
+        <type>FUNCTION</type>
+        <code>function findDataFromDB(action,requestMap,groupBy) {
+					var result = null
+					if(action == &quot;PRACTITIONER&quot;){
+					return result = findPractitioner(requestMap,groupBy)
+					}
+
+					if(action == &quot;LOCATION&quot;){
+					return result = findLocation(requestMap)
+					}
+
+					if(action == &quot;USER&quot;){
+					return result = findUser(requestMap,groupBy)
+					}
+
+					if(action == &quot;USERGROUP&quot;){
+					return result = findUserGroup(requestMap,groupBy)
+					}
+
+					if(action == &quot;ORGANIZATION&quot;){
+					return result = findOrganization(requestMap)
+					}
+					if(action == &quot;ROLES&quot;){
+					return result = findRoles(requestMap)
+					}
+
+					if(action==&quot;MENUITEM&quot;){
+					return result = findMenuItem(requestMap)
+					}
+
+					if(action == &quot;COUNTRIESSET&quot;){
+					return result = findCountriesSet(requestMap,groupBy)
+					}
+					
+					if(action == &quot;CITIESSET&quot;){
+					return result = findCitiesSet(requestMap,groupBy)
+					}
+					
+					if(action == &quot;STATESSET&quot;){
+					return result = findStatesSet(requestMap,groupBy)
+					}
+         
+					}
+
+function findLocation(requestMap){
+  	  logger.info(&quot;Inside Find Location function With &quot; + requestMap.get(&apos;keyName&apos;))
+					var locationData=null
+					var queryMap ={}
+					if(JSON.parse(configurationMap.get(&apos;collectionsName&apos;)).locationCollectionName){
+					var locationQuery= new Packages.com.mongodb.BasicDBObject(requestMap.get(&apos;keyName&apos;),requestMap.get(&apos;keyValue&apos;))
+					queryMap.collectionName = JSON.parse(configurationMap.get(&apos;collectionsName&apos;)).locationCollectionName
+					queryMap.find = locationQuery
+					locationData =MongoGlobalService(&quot;search&quot;,queryMap)
+					}else{
+					logger.error(&quot;Location Collection name is not defined in configurationMap&quot;)
+					}
+
+					return locationData;
+					}
+
+function findUserGroup(requestMap,groupBy){
+					logger.info(&quot;Inside findUsergroup Function&quot; + requestMap)
+					var userGroupSearchResponse=null
+					var queryMap ={}
+					if(JSON.parse(configurationMap.get(&apos;collectionsName&apos;)).userGroupCollectionName){
+					var searchList = new Packages.java.util.ArrayList();
+					for (key in requestMap){
+					//logger.info(&quot;Iteration of searchMap : &quot;+key+&quot; : &quot;+requestMap[key])
+					searchList.add(new Packages.com.mongodb.BasicDBObject(key, requestMap[key]));
+					}
+					queryMap.collectionName=JSON.parse(configurationMap.get(&apos;collectionsName&apos;)).userGroupCollectionName;
+					if(groupBy == &quot;OR&quot;){
+					queryMap.find = new Packages.com.mongodb.BasicDBObject(&apos;$or&apos;, searchList);
+					}else{
+					queryMap.find = new Packages.com.mongodb.BasicDBObject(&apos;$and&apos;, searchList);
+
+					}
+					userGroupCollectionName =  MongoGlobalService(&quot;search&quot;,queryMap)
+					}else{
+					logger.error(&quot;userGroup Collection Name is not defined in configurationMap&quot;)
+					}
+					return userGroupCollectionName;
+					}
+
+function findUser(requestMap,groupBy){
+					logger.info(&quot;Inside Search User Function&quot; + requestMap)
+					var userSearch_res=null
+					var queryMap ={}
+					if(JSON.parse(configurationMap.get(&apos;collectionsName&apos;)).userCollectionName){
+					var searchList = new Packages.java.util.ArrayList();
+					for (key in requestMap){
+					//logger.info(&quot;Iteration of searchMap : &quot;+key+&quot; : &quot;+requestMap[key])
+					searchList.add(new Packages.com.mongodb.BasicDBObject(key, requestMap[key]));
+					}
+					queryMap.collectionName=JSON.parse(configurationMap.get(&apos;collectionsName&apos;)).userCollectionName;
+					if(groupBy == &quot;OR&quot;){
+					queryMap.find = new Packages.com.mongodb.BasicDBObject(&apos;$or&apos;, searchList);
+					}else{
+					queryMap.find = new Packages.com.mongodb.BasicDBObject(&apos;$and&apos;, searchList);
+
+					}
+					userSearch_res =  MongoGlobalService(&quot;search&quot;,queryMap)
+					}else{
+					logger.error(&quot;User Collection Name is not defined in configurationMap&quot;)
+					}
+					return userSearch_res;
+					}
+
+
+function findPractitioner(requestMap,groupBy){
+					logger.info(&quot;Inside Find Practitioner&quot;)
+					var practitionerSearchData=null
+					var queryMap= {}
+					if(JSON.parse(configurationMap.get(&apos;collectionsName&apos;)).practitionerCollectionName){
+					var searchList = new Packages.java.util.ArrayList();
+					for (key in requestMap){
+					//logger.info(&quot;Iteration of searchMap : &quot;+key+&quot; : &quot;+requestMap[key])
+					searchList.add(new Packages.com.mongodb.BasicDBObject(key, requestMap[key]));
+					}
+					queryMap.collectionName=JSON.parse(configurationMap.get(&apos;collectionsName&apos;)).practitionerCollectionName;
+					if(groupBy == &quot;OR&quot;){
+					queryMap.find = new Packages.com.mongodb.BasicDBObject(&apos;$or&apos;, searchList);
+					}else{
+					queryMap.find = new Packages.com.mongodb.BasicDBObject(&apos;$and&apos;, searchList);
+
+					}
+
+					//logger.info(&quot;FINDQUERY : &quot;+queryMap.find)
+					practitionerSearchData  =  MongoGlobalService(&quot;search&quot;,queryMap)
+					}else{
+					logger.error(&quot;Practitioner collection Name is not defined in configurationMap&quot;)
+					}
+
+					return practitionerSearchData;
+
+					}
+
+
+function findOrganization(requestMap){
+					logger.info(&quot;[Find Organization ] :  Inside getOrganization Function &quot; +requestMap.get(&apos;keyName&apos;))
+					var organizationData=null
+					var queryMap = {}
+					if(JSON.parse(configurationMap.get(&apos;collectionsName&apos;)).orgCollectionName){
+					var organizationQuery=new Packages.com.mongodb.BasicDBObject(requestMap.get(&apos;keyName&apos;),requestMap.get(&apos;keyValue&apos;))
+					queryMap.collectionName = JSON.parse(configurationMap.get(&apos;collectionsName&apos;)).orgCollectionName;
+					queryMap.find=  organizationQuery
+					organizationData= MongoGlobalService(&quot;search&quot;,queryMap)
+
+					}else{
+					logger.error(&quot;Organization collectionName is not defined in configurationMap&quot;)
+					}
+					return organizationData;
+					}
+
+
+function findRoles(requestMap){
+					logger.info(&quot;[Find Roles ] :  Inside findRoles Function &quot;)
+					var rolesData=null
+					var queryMap = {}
+					if(JSON.parse(configurationMap.get(&apos;collectionsName&apos;)).roleCollectionName){
+					var rolesQuery = new Packages.com.mongodb.BasicDBObject(requestMap.get(&apos;keyName&apos;),requestMap.get(&apos;keyValue&apos;))
+					queryMap.collectionName = JSON.parse(configurationMap.get(&apos;collectionsName&apos;)).roleCollectionName;
+					queryMap.find=  rolesQuery
+					rolesData= MongoGlobalService(&quot;search&quot;,queryMap)
+
+					}else{
+					logger.error(&quot;Roles collectionName is not defined in configurationMap&quot;)
+					}
+					return rolesData
+					}
+
+
+function findMenuItem(requestMap){
+					logger.info(&quot;[Find Roles ] :  Inside findMenuItem Function &quot;)
+					var menuData=null
+					var queryMap={}
+					if(JSON.parse(configurationMap.get(&apos;collectionsName&apos;)).menuCollectionName){
+					var menuQuery = new Packages.com.mongodb.BasicDBObject(requestMap.get(&apos;keyName&apos;),requestMap.get(&apos;keyValue&apos;))
+					queryMap.collectionName = JSON.parse(configurationMap.get(&apos;collectionsName&apos;)).menuCollectionName;
+					queryMap.find=  menuQuery
+					menuData= MongoGlobalService(&quot;search&quot;, queryMap)
+					}else{
+					logger.error(&quot;menuItem collectionName is not defined in configurationMap&quot;)
+					}
+					return menuData
+					}
+
+</code>
+      </properties>
+    </codeTemplate>
+    <codeTemplate version="3.9.1">
+      <id>95a762a5-c732-4885-a1bd-9268087298c9</id>
+      <name>Template 2</name>
+      <revision>3</revision>
+      <lastModified>
+        <time>1677337433195</time>
+        <timezone>UTC</timezone>
+      </lastModified>
+      <contextSet>
+        <delegate>
+          <contextType>DESTINATION_DISPATCHER</contextType>
+          <contextType>DESTINATION_RESPONSE_TRANSFORMER</contextType>
+          <contextType>SOURCE_FILTER_TRANSFORMER</contextType>
+          <contextType>DESTINATION_FILTER_TRANSFORMER</contextType>
+          <contextType>SOURCE_RECEIVER</contextType>
+        </delegate>
+      </contextSet>
+      <properties class="com.mirth.connect.model.codetemplates.BasicCodeTemplateProperties">
+        <type>FUNCTION</type>
+        <code>function findCitiesSet(requestMap,groupBy){
+                                logger.info(&quot;[Find CitesSet ] :  Inside findCitesSet Function &quot;)
+                                var citiesSetData=null
+                                var queryMap={}
+                                if(JSON.parse(configurationMap.get(&apos;collectionsName&apos;)).citiesSetCollectionName){
+                                var searchList = new Packages.java.util.ArrayList();
+                                for (key in requestMap){
+                                //logger.info(&quot;Iteration of searchMap : &quot;+key+&quot; : &quot;+requestMap[key])
+                                searchList.add(new Packages.com.mongodb.BasicDBObject(key, requestMap[key]));
+                                }
+                                queryMap.collectionName = JSON.parse(configurationMap.get(&apos;collectionsName&apos;)).citiesSetCollectionName;
+								
+								if(groupBy == &quot;OR&quot;){
+                                queryMap.find = new Packages.com.mongodb.BasicDBObject(&apos;$or&apos;, searchList);
+                                }else{
+                                queryMap.find = new Packages.com.mongodb.BasicDBObject(&apos;$and&apos;, searchList);
+                                }
+                                citiesSetData= MongoGlobalService(&quot;search&quot;, queryMap)
+                                }else{
+                                logger.error(&quot;CitesSet collectionName is not defined in configurationMap&quot;)
+                                }
+                                return citiesSetData
+                                }
+
+function findCountriesSet(requestMap,groupBy){
+                                logger.info(&quot;[Find CountriesSet ] :  Inside findCountriesSet Function &quot;)
+                                var countriesSetData=null
+                                var queryMap={}
+                                if(JSON.parse(configurationMap.get(&apos;collectionsName&apos;)).countriesSetCollectionName){
+                                	logger.info(&quot;inside 1st if of code template&quot;)
+                                var searchList = new Packages.java.util.ArrayList();
+                                for (key in requestMap){
+                                //logger.info(&quot;Iteration of searchMap : &quot;+key+&quot; : &quot;+requestMap[key])
+                                searchList.add(new Packages.com.mongodb.BasicDBObject(key, requestMap[key]));
+                                }
+                                queryMap.collectionName = JSON.parse(configurationMap.get(&apos;collectionsName&apos;)).countriesSetCollectionName;
+								
+								if(groupBy == &quot;OR&quot;){
+									logger.info(&quot;inside 1.1 if of code template&quot;)
+                                queryMap.find = new Packages.com.mongodb.BasicDBObject(&apos;$or&apos;, searchList);
+                                }else{
+                                	logger.info(&quot;inside 1.1 else of code template&quot;)
+                                queryMap.find = new Packages.com.mongodb.BasicDBObject(&apos;$and&apos;, searchList);
+                                }
+                                countriesSetData= MongoGlobalService(&quot;search&quot;, queryMap)
+                                }else{
+                                	logger.info(&quot;inside 1 else of code template&quot;)
+                                logger.error(&quot;CountriesSet collectionName is not defined in configurationMap&quot;)
+                                }
+                                logger.info(&quot;countriesSetData - &quot;+countriesSetData)
+                                return countriesSetData
+                                }
+
+function findStatesSet(requestMap,groupBy){
+                                logger.info(&quot;[Find StatesSet ] :  Inside FindStatesSet Function &quot;)
+                                var statesSetData=null
+                                var queryMap={}
+                                if(JSON.parse(configurationMap.get(&apos;collectionsName&apos;)).statesSetCollectionName){
+                                var searchList = new Packages.java.util.ArrayList();
+                                for (key in requestMap){
+                                //logger.info(&quot;Iteration of searchMap : &quot;+key+&quot; : &quot;+requestMap[key])
+                                searchList.add(new Packages.com.mongodb.BasicDBObject(key, requestMap[key]));
+                                }
+                                queryMap.collectionName = JSON.parse(configurationMap.get(&apos;collectionsName&apos;)).statesSetCollectionName;
+								
+								if(groupBy == &quot;OR&quot;){
+                                queryMap.find = new Packages.com.mongodb.BasicDBObject(&apos;$or&apos;, searchList);
+                                }else{
+                                queryMap.find = new Packages.com.mongodb.BasicDBObject(&apos;$and&apos;, searchList);
+                                }
+                                statesSetData= MongoGlobalService(&quot;search&quot;, queryMap)
+                                }else{
+                                logger.error(&quot;StatesSet collectionName is not defined in configurationMap&quot;)
+                                }
+                                return statesSetData
+                                }</code>
+      </properties>
+    </codeTemplate>
+  </codeTemplates>
+</codeTemplateLibrary>
